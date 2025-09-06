@@ -29,20 +29,33 @@ class InterviewBot:
         self.scores = []
 
     def generate_questions(self, num_questions: int = 3) -> List[str]:
-        """Generate interview questions based on role, domain, and interview type."""
+        """Generate interview questions and ideal answers based on role, domain, and interview type."""
         prompt = self._create_questions_prompt(num_questions)
         
         response = get_client().chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": f"You are an expert technical interviewer specializing in {self.role} positions with extensive industry experience. You create challenging but fair interview questions that assess both theoretical knowledge and practical skills."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": f"You are an expert technical interviewer specializing in {self.role} positions with extensive industry experience. For each question, provide an ideal answer that would score 10/10."},
+                {"role": "user", "content": prompt + "\n\nFor each question, also provide an ideal answer that demonstrates excellence in the role. Format as 'Q1. [Question]\nA1. [Ideal Answer]\n\nQ2. [Question]\nA2. [Ideal Answer]' etc."}
             ]
         )
         
-        # Parse the response and extract questions
-        questions = response.choices[0].message.content.strip().split('\n')
-        self.questions = [q.strip('1234567890. ') for q in questions if q.strip()]
+        # Parse the response and extract questions and ideal answers
+        content = response.choices[0].message.content.strip()
+        qa_pairs = content.split('\n\n')
+        
+        self.questions = []
+        self.ideal_answers = []
+        
+        for pair in qa_pairs:
+            if pair.strip():
+                parts = pair.split('\n', 1)
+                if len(parts) == 2:
+                    question = parts[0].strip().split('.', 1)[1].strip()
+                    ideal_answer = parts[1].strip().split('.', 1)[1].strip()
+                    self.questions.append(question)
+                    self.ideal_answers.append(ideal_answer)
+        
         return self.questions
 
     def evaluate_answer(self, answer: str) -> Tuple[str, float]:
