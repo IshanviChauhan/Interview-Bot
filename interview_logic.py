@@ -3,10 +3,13 @@ from typing import Dict, List, Tuple
 import os
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client with default configuration
-client = OpenAI()
+# Initialize OpenAI client with minimal configuration
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
 class InterviewBot:
     def __init__(self, role: str, domain: str = None, interview_type: str = "technical"):
