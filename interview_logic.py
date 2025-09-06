@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize OpenAI client with default configuration
+client = OpenAI()
 
 class InterviewBot:
     def __init__(self, role: str, domain: str = None, interview_type: str = "technical"):
