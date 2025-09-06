@@ -4,24 +4,39 @@ from interview_logic import InterviewBot
 from session_manager import SessionManager
 from dotenv import load_dotenv
 
-# Initialize API key to None
+# Get API key from environment variables
 api_key = None
 
-# First, try to get the API key from Streamlit secrets
-try:
-    api_key = st.secrets["OPENAI_API_KEY"]
-except (FileNotFoundError, KeyError):
-    # If Streamlit secrets fail, try loading from .env file
-    load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
+# For Streamlit Cloud, check secrets first
+if hasattr(st, "secrets"):
+    try:
+        api_key = st.secrets["OPENAI_API_KEY"]
+        st.success("Successfully loaded API key from Streamlit secrets")
+    except Exception as e:
+        st.warning("Could not load API key from Streamlit secrets")
 
-# Check if we have a valid API key
+# If no API key yet, try local .env file
+if not api_key:
+    try:
+        load_dotenv()
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            st.success("Successfully loaded API key from .env file")
+    except Exception as e:
+        st.warning("Could not load API key from .env file")
+
+# Final check for API key
 if not api_key:
     st.error("""
     OpenAI API key not found. Please set it in one of:
-    1. .streamlit/secrets.toml file
-    2. .env file
-    3. Streamlit Cloud secrets
+    1. Streamlit Cloud Secrets
+    2. Local .env file
+    
+    To set up Streamlit Cloud Secrets:
+    1. Go to your app dashboard
+    2. Click on 'Manage app' ⚙️
+    3. Go to 'Secrets' section
+    4. Add your key as: OPENAI_API_KEY = "your-api-key-here"
     """)
     st.stop()
 
