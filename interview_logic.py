@@ -6,10 +6,16 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client with minimal configuration
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+# Initialize OpenAI client lazily to ensure environment is properly set up
+client = None
+
+def get_client():
+    global client
+    if client is None:
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OpenAI API key is not set in the environment")
+        client = OpenAI()
+    return client
 
 class InterviewBot:
     def __init__(self, role: str, domain: str = None, interview_type: str = "technical"):
@@ -26,7 +32,7 @@ class InterviewBot:
         """Generate interview questions based on role, domain, and interview type."""
         prompt = self._create_questions_prompt(num_questions)
         
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": f"You are an expert technical interviewer specializing in {self.role} positions with extensive industry experience. You create challenging but fair interview questions that assess both theoretical knowledge and practical skills."},
@@ -48,7 +54,7 @@ class InterviewBot:
         
         prompt = self._create_evaluation_prompt(current_question, answer)
         
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": f"You are an expert {self.role} interviewer with deep industry experience. You provide detailed, constructive feedback that helps candidates improve their technical and communication skills. Your evaluation is based on industry standards and best practices specific to {self.domain if self.domain else 'the role'}."},
@@ -91,7 +97,7 @@ class InterviewBot:
         4. Overall score (0-10)
         """
         
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are an expert interviewer providing a final evaluation."},
