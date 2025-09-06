@@ -5,7 +5,15 @@ from session_manager import SessionManager
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+load_dotenv()  # Load from .env file for local development
+
+# For Streamlit Cloud deployment, use secrets
+if os.getenv("OPENAI_API_KEY") is None and hasattr(st, "secrets"):
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+
+if "OPENAI_API_KEY" not in os.environ:
+    st.error("OpenAI API key not found. Please set it in .env file or Streamlit secrets.")
+    st.stop()
 
 # Initialize session state
 if 'interview_bot' not in st.session_state:
