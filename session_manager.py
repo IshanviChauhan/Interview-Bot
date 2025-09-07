@@ -66,18 +66,33 @@ class SessionManager:
             2. Download and install wkhtmltopdf from: https://wkhtmltopdf.org/downloads.html
             """)
             
-        # Set the path to wkhtmltopdf
-        wkhtmltopdf_path = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
-        if not os.path.exists(wkhtmltopdf_path):
-            wkhtmltopdf_path = r"C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe"
+        # Set the path to wkhtmltopdf with improved error handling
+        wkhtmltopdf_paths = [
+            r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe",
+            r"C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe"
+        ]
         
-        if not os.path.exists(wkhtmltopdf_path):
-            raise OSError("""
-            wkhtmltopdf executable not found. Please ensure it's installed correctly:
-            1. Download from: https://wkhtmltopdf.org/downloads.html
-            2. Install and ensure it's in your system PATH
-            Expected location: C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe
-            """)
+        wkhtmltopdf_path = None
+        for path in wkhtmltopdf_paths:
+            if os.path.exists(path):
+                wkhtmltopdf_path = path
+                break
+        
+        if not wkhtmltopdf_path:
+            # Check if wkhtmltopdf is in PATH
+            import shutil
+            if shutil.which("wkhtmltopdf"):
+                wkhtmltopdf_path = "wkhtmltopdf"  # Use system PATH
+            else:
+                raise OSError("""
+                wkhtmltopdf executable not found. Please ensure it's installed correctly:
+                
+                Download from: https://wkhtmltopdf.org/downloads.html
+                Install and ensure it's in your system PATH
+                Expected location: C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe
+                
+                Alternative: Add C:\\Program Files\\wkhtmltopdf\\bin to your system PATH
+                """)
             
         try:
             # Create HTML content
@@ -121,7 +136,12 @@ class SessionManager:
             """
             
             # Convert HTML to PDF using pdfkit
-            config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
+            if wkhtmltopdf_path == "wkhtmltopdf":
+                # Use system PATH
+                config = None
+            else:
+                # Use specific path
+                config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
             options = {
                 'page-size': 'A4',
                 'margin-top': '0.75in',
