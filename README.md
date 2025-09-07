@@ -12,7 +12,7 @@ An AI-powered interview preparation tool that simulates technical and behavioral
 
 ## Live Demo
 
-Try it out here: [Interview Preparation Bot](https://interview-bot-ishanvi.streamlit.app)
+Try it out here: [Mock View](https://mock-view.streamlit.app/) 
 
 ## Local Development
 
