@@ -120,6 +120,5 @@ streamlit run app.py
 - Option to tune category weighting
 - Export final report with identical layout to PDF
 
-## License
 
-MIT (or your chosen license)
+By Ishanvi Chauhan
