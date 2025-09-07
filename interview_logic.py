@@ -116,11 +116,13 @@ class InterviewBot:
         if not self.questions:
             raise ValueError("No questions available. Generate questions first.")
         q = self.questions[self.current_question_index]
+        ideal_answer = self.ideal_answers[self.current_question_index] if self.current_question_index < len(self.ideal_answers) else "Not available"
+        
         eval_prompt = ChatPromptTemplate.from_messages([
             ("system", "You are an expert {role} interviewer (domain: {domain})."),
             ("human", "{prompt}"),
         ])
-        prompt = self._create_evaluation_prompt(q, answer)
+        prompt = self._create_evaluation_prompt(q, answer, ideal_answer)
         llm = get_llm()
         msgs = eval_prompt.format_messages(role=self.role, domain=self.domain or 'general', prompt=prompt, interview_type=self.interview_type)
         resp = llm.invoke(msgs)
@@ -138,28 +140,73 @@ class InterviewBot:
     def generate_final_summary(self) -> Dict:
         if not self.answers:
             raise ValueError("No answers to summarize.")
+        
         summary_prompt = ChatPromptTemplate.from_messages([
             ("system", "You are an expert interviewer providing a final evaluation."),
             ("human", "{prompt}"),
         ])
-        prompt = f"""
-        Based on the following interview session, provide a comprehensive summary:
-        Role: {self.role}
-        Domain: {self.domain}
-        Interview Type: {self.interview_type}
         
-        Questions and Answers:
-        {self._format_qa_pairs()}
+        if self.interview_type.lower() == "technical":
+            prompt = f"""
+            Based on the following TECHNICAL interview session, provide a comprehensive evaluation:
+            
+            Role: {self.role}
+            Domain: {self.domain or 'General'}
+            Interview Type: Technical
+            
+            Questions and Answers:
+            {self._format_qa_pairs()}
+            
+            Provide a TECHNICAL evaluation with:
+            
+            ## Overall Technical Performance Summary
+            Brief overview of the candidate's technical competency.
+            
+            ## Top 3 Technical Strengths
+            Specific technical skills, problem-solving abilities, or domain knowledge demonstrated.
+            
+            ## Top 3 Technical Areas for Improvement
+            Specific technical gaps, coding improvements, or knowledge areas to strengthen.
+            
+            ## Recommended Technical Resources
+            Specific learning resources (courses, books, documentation) to address improvement areas.
+            
+            ## Overall Technical Score (0-10)
+            Numeric score reflecting technical proficiency for this {self.role} role{' in ' + self.domain if self.domain else ''}.
+            """
+        else:  # Behavioral
+            prompt = f"""
+            Based on the following BEHAVIORAL interview session, provide a comprehensive evaluation:
+            
+            Role: {self.role}
+            Domain: {self.domain or 'General'}
+            Interview Type: Behavioral
+            
+            Questions and Answers:
+            {self._format_qa_pairs()}
+            
+            Provide a BEHAVIORAL evaluation with:
+            
+            ## Overall Behavioral Assessment Summary
+            Brief overview of the candidate's leadership, communication, and soft skills.
+            
+            ## Top 3 Behavioral Strengths
+            Specific leadership qualities, communication skills, or professional competencies demonstrated.
+            
+            ## Top 3 Behavioral Areas for Improvement
+            Specific soft skills, leadership capabilities, or professional development areas to strengthen.
+            
+            ## Recommended Development Resources
+            Specific resources (books, courses, frameworks) for behavioral and leadership development.
+            
+            ## Overall Behavioral Score (0-10)
+            Numeric score reflecting behavioral competency and cultural fit for this {self.role} role{' in ' + self.domain if self.domain else ''}.
+            """
         
-        Please provide:
-        1. Top 3 strengths
-        2. Top 3 areas for improvement
-        3. Specific resources for improvement
-        4. Overall score (0-10)
-        """
         llm = get_llm()
         msgs = summary_prompt.format_messages(prompt=prompt)
         resp = llm.invoke(msgs)
+        
         return {
             "summary": resp.content or "",
             "average_score": sum(self.scores) / len(self.scores) if self.scores else 0,
@@ -171,26 +218,45 @@ class InterviewBot:
         role = self.role or ""
         domain = self.domain or ""
         itype = self.interview_type or ""
+        
         resources_prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful assistant that returns strict JSON when asked."),
             ("human", "{prompt}"),
         ])
+        
+        if itype.lower() == "technical":
+            resource_focus = f"technical skills, coding abilities, operating system knowledge, computer networks knowledge, computer fundamentals knowledge, database concepts, system design knowledge, and {domain if domain else 'general software development'} expertise"
+            resource_types = "technical documentation, coding tutorials, system design courses, algorithm practice platforms, operating systems textbooks, networking guides, database design resources, and domain-specific technical resources"
+        else:  # Behavioral
+            resource_focus = f"leadership skills, communication abilities, behavioral competencies, and professional development for {role} roles"
+            resource_types = "leadership books, communication courses, behavioral interview guides, professional development resources, and soft skills training"
+        
         prompt = f"""
-        Suggest {num_items} high-quality, up-to-date learning resources tailored to a candidate preparing for {role} {('in ' + domain) if domain else ''} ({itype}).
-        Include docs, tutorials, courses, and books where appropriate. Prefer authoritative sources.
-        Ensure relevance to both conceptual depth and factual knowledge areas.
-        Consider this interview summary and gaps:
+        Suggest {num_items} high-quality, up-to-date learning resources for a {role} candidate
+        {('specializing in ' + domain) if domain else ''} preparing for {itype} interviews.
+        
+        Focus on improving: {resource_focus}
+        
+        Include: {resource_types}
+        
+        Prefer authoritative, well-known sources. Consider gaps identified in this interview summary:
         ---
         {summary_text}
         ---
-        Respond as a compact JSON array where each item is an object with keys: "title" and "url" (absolute https link). Example:
+        
+        Respond as a compact JSON array where each item is an object with keys: "title" and "url" (absolute https link). 
+        
+        Example format:
         [{{"title":"System Design Primer","url":"https://github.com/donnemartin/system-design-primer"}}]
+        
         Do not add commentary outside JSON.
         """
+        
         llm = get_llm()
         msgs = resources_prompt.format_messages(prompt=prompt)
         resp = llm.invoke(msgs)
         content = (resp.content or "").strip()
+        
         resources: List[Tuple[str, str]] = []
         try:
             data = json.loads(content)
@@ -200,6 +266,7 @@ class InterviewBot:
                     url = (item.get("url") if isinstance(item, dict) else "") or ""
                     resources.append((str(title), str(url)))
         except Exception:
+            # Fallback parsing for non-JSON responses
             for line in content.splitlines():
                 if not line.strip():
                     continue
@@ -208,6 +275,7 @@ class InterviewBot:
                     resources.append((parts[0].strip(), parts[1].strip()))
                 else:
                     resources.append((line.strip(), ""))
+        
         return resources
 
     def _create_questions_prompt(self, num_questions: int, exclude: str | None = None) -> str:
@@ -222,9 +290,12 @@ class InterviewBot:
                 f"{' specializing in ' + domain if domain and domain != 'general' else ''}.\n\n"
                 f"IMPORTANT: Focus ONLY on technical aspects. NO behavioral questions allowed.\n\n"
                 f"Question Categories (balanced distribution):\n"
-                f"- Algorithm/Coding Problems (≥40%): {domain_context['coding']}\n"
-                f"- System Design (≥25%): {domain_context['system_design']}\n"
-                f"- Domain-Specific Technical Concepts (≥25%): {domain_context['domain_concepts']}\n"
+                f"- Algorithm/Coding Problems (≥30%): {domain_context['coding']}\n"
+                f"- System Design (≥20%): {domain_context['system_design']}\n"
+                f"- Domain-Specific Technical Concepts (≥20%): {domain_context['domain_concepts']}\n"
+                f"- Operating System Concepts (≥10%): Process management, memory management, file systems, concurrency, deadlocks, scheduling algorithms\n"
+                f"- Computer Networks Concepts (≥10%): TCP/IP, HTTP/HTTPS, DNS, load balancing, network protocols, security, routing\n"
+                f"- Database Concepts (≥10%): SQL queries, indexing, normalization, ACID properties, transactions, NoSQL vs SQL, database design\n"
                 f"- Technical Definitions & Best Practices (≥10%): {domain_context['definitions']}\n\n"
                 f"Technical Requirements:\n"
                 f"- Each question must test distinct technical knowledge or problem-solving skills\n"
@@ -233,6 +304,9 @@ class InterviewBot:
                 f"- STRICTLY AVOID: teamwork, leadership, conflict resolution, communication, project management\n\n"
                 f"Example Technical Question Formats (adapt to {domain}):\n"
                 f"{domain_context['examples']}\n"
+                f"  • Explain how virtual memory works and its benefits in modern operating systems\n"
+                f"  • Design a database schema for an e-commerce platform with proper normalization\n"
+                f"  • Compare TCP and UDP protocols - when would you use each?\n"
             )
         else:  # Behavioral interview
             # Create domain-specific behavioral prompts
@@ -260,16 +334,59 @@ class InterviewBot:
             base += "\n\nAVOID DUPLICATING these existing questions:\n" + exclude
         return base
 
-    def _create_evaluation_prompt(self, question: str, answer: str) -> str:
-        return f"""
-        Question: {question}
-        Candidate's Answer: {answer}
-        
-        Provide:
-        - Key strengths (bullets)
-        - Areas for improvement (bullets with actionable guidance)
-        - Score: X/10 (numeric)
-        """
+    def _create_evaluation_prompt(self, question: str, answer: str, ideal_answer: str) -> str:
+        if self.interview_type.lower() == "technical":
+            return f"""
+            TECHNICAL INTERVIEW EVALUATION
+            Role: {self.role}{' - ' + self.domain if self.domain else ''}
+            
+            Question: {question}
+            Candidate's Answer: {answer}
+            Ideal Answer: {ideal_answer}
+            
+            Evaluate this TECHNICAL response based on:
+            
+            TECHNICAL CRITERIA:
+            - Correctness: Is the solution technically accurate?
+            - Completeness: Does it address all parts of the question?
+            - Code Quality: Clean, readable, efficient implementation (if applicable)
+            - Technical Depth: Understanding of underlying concepts and trade-offs
+            - Problem-Solving Approach: Logical thinking and systematic approach
+            - Domain Knowledge: Relevant expertise for the specific domain/role
+            
+            Provide:
+            - Key Technical Strengths (bullets)
+            - Technical Areas for Improvement (bullets with specific guidance)
+            - Missing Technical Elements (if any)
+            - Comparison to Ideal Answer: How does the candidate's response compare to the expected ideal answer?
+            - Score: X/10 (numeric - where 10 is expert-level technical proficiency)
+            """
+        else:  # Behavioral
+            return f"""
+            BEHAVIORAL INTERVIEW EVALUATION
+            Role: {self.role}{' - ' + self.domain if self.domain else ''}
+            
+            Question: {question}
+            Candidate's Answer: {answer}
+            Ideal Answer Framework: {ideal_answer}
+            
+            Evaluate this BEHAVIORAL response based on:
+            
+            BEHAVIORAL CRITERIA:
+            - STAR Structure: Situation, Task, Action, Result clearly articulated
+            - Leadership & Impact: Demonstrates ownership and influence
+            - Problem-Solving: Shows analytical thinking and decision-making
+            - Communication: Clear, structured, and engaging storytelling
+            - Self-Awareness: Reflects on learnings and growth
+            - Relevance: Appropriate for the role and domain context
+            
+            Provide:
+            - Key Behavioral Strengths (bullets)
+            - Behavioral Areas for Improvement (bullets with specific guidance)
+            - Missing STAR Elements (if any)
+            - Comparison to Ideal Framework: How does the candidate's response align with expected behavioral competencies?
+            - Score: X/10 (numeric - where 10 is exceptional behavioral competency)
+            """
 
     def _format_qa_pairs(self) -> str:
         return "\n".join([f"Q: {q}\nA: {a}\n" for q, a in zip(self.questions, self.answers)])
@@ -290,7 +407,7 @@ class InterviewBot:
                     "system_design": "Microservices architecture, load balancing, database sharding, caching layers, message queues",
                     "domain_concepts": "REST vs GraphQL, authentication/authorization, rate limiting, API versioning",
                     "definitions": "ACID properties, eventual consistency, idempotency, distributed systems concepts",
-                    "examples": "  • Design a rate limiting algorithm for an API gateway\n  • Implement a distributed cache with consistent hashing\n  • Explain database indexing strategies for high-read workloads"
+                    "examples": "  • Design a rate limiting algorithm for an API gateway\n  • Implement a distributed cache with consistent hashing\n  • Explain database indexing strategies for high-read workloads\n  • How does TCP connection pooling improve database performance?\n  • Explain the difference between mutex and semaphore in concurrent programming\n  • Design a database backup and recovery strategy for a high-availability system"
                 },
                 "Mobile Development": {
                     "coding": "Platform-specific algorithms, memory management, offline-first data structures, touch gesture handling",
@@ -304,14 +421,14 @@ class InterviewBot:
                     "system_design": "Large-scale system architecture, fault tolerance, scalability patterns, data consistency models",
                     "domain_concepts": "CAP theorem, distributed consensus, eventual consistency, sharding strategies",
                     "definitions": "Horizontal vs vertical scaling, consistent hashing, circuit breaker pattern",
-                    "examples": "  • Design a globally distributed chat application like WhatsApp\n  • Implement a consistent hashing algorithm for distributed caching\n  • Explain the trade-offs between different consensus algorithms"
+                    "examples": "  • Design a globally distributed chat application like WhatsApp\n  • Implement a consistent hashing algorithm for distributed caching\n  • Explain the trade-offs between different consensus algorithms\n  • How would you design a database replication strategy across multiple data centers?\n  • Explain how load balancers handle SSL termination and session affinity\n  • Design a file system that can handle petabytes of data with high availability"
                 },
                 "general": {
                     "coding": "Data structures, algorithms, object-oriented design, problem-solving patterns",
                     "system_design": "Application architecture, database design, API design, scalability considerations",
                     "domain_concepts": "Design patterns, SOLID principles, testing strategies, version control",
                     "definitions": "Big O notation, data structure properties, software engineering principles",
-                    "examples": "  • Implement a LRU cache with O(1) operations\n  • Design a URL shortening service like bit.ly\n  • Explain when to use different data structures"
+                    "examples": "  • Implement a LRU cache with O(1) operations\n  • Design a URL shortening service like bit.ly\n  • Explain when to use different data structures\n  • What is the difference between process and thread in operating systems?\n  • Design a database schema for a social media platform with proper indexing\n  • Explain how HTTP cookies work and their security implications"
                 }
             },
             "Data Scientist": {
@@ -334,7 +451,7 @@ class InterviewBot:
                     "system_design": "Data warehouse design, ETL pipelines, analytics platforms, reporting systems",
                     "domain_concepts": "Statistical inference, experimental design, data quality, model evaluation",
                     "definitions": "P-values, confidence intervals, correlation vs causation, sampling bias",
-                    "examples": "  • Design an A/B testing framework with proper statistical rigor\n  • Implement a data quality monitoring system\n  • Explain different sampling techniques and their applications"
+                    "examples": "  • Design an A/B testing framework with proper statistical rigor\n  • Implement a data quality monitoring system\n  • Explain different sampling techniques and their applications\n  • How would you optimize SQL queries for large analytical datasets?\n  • Design a data pipeline that can handle real-time streaming data\n  • Explain OLAP vs OLTP database systems and their use cases"
                 }
             }
         }
