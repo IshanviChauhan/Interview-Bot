@@ -3,6 +3,15 @@ import os
 from interview_logic import InterviewBot
 from session_manager import SessionManager
 from dotenv import load_dotenv
+import html
+import re
+
+# Page config must be the first Streamlit call
+st.set_page_config(
+    page_title="Mock View",
+    page_icon="🎯",
+    layout="wide",
+)
 
 # Get API key from environment variables
 api_key = None
@@ -129,8 +138,82 @@ def initialize_interview():
     st.session_state.current_question = questions[0]
     st.session_state.interview_complete = False
 
+def _strip_markdown(text: str) -> str:
+    """Remove common markdown symbols (#, *, _, >, backticks, links, etc.)."""
+    if not text:
+        return ""
+    # Remove code fences and inline code
+    text = re.sub(r"```[\s\S]*?```", " ", text)
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    # Remove headings and blockquotes
+    text = re.sub(r"^\s*#{1,6}\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*>\s?", "", text, flags=re.MULTILINE)
+    # Remove list markers
+    text = re.sub(r"^\s*[\-\*\+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+[\.)]\s+", "", text, flags=re.MULTILINE)
+    # Remove emphasis markers
+    text = text.replace("**", "").replace("__", "").replace("*", "").replace("_", "")
+    # Convert markdown links [text](url) -> text
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
+    return text.strip()
+
+def _bulletify_feedback(raw_feedback: str, max_items: int = 5) -> str:
+    """Convert raw feedback text into a short bullet list HTML without markdown symbols."""
+    if not raw_feedback:
+        return "<ul class=\"bullets\"><li>No feedback available.</li></ul>"
+    lines = [l.strip() for l in (raw_feedback or "").splitlines()]
+    lines = [l for l in lines if l]
+    # If feedback is one long paragraph, split into sentences
+    if len(lines) <= 1 and lines:
+        sentences = re.split(r"(?<=[.!?])\s+", lines[0])
+        lines = [s.strip() for s in sentences if s.strip()]
+    bullets = [_strip_markdown(l) for l in lines][:max_items]
+    items_html = "\n".join([f"<li>{html.escape(item)}</li>" for item in bullets if item])
+    return f"<ul class=\"bullets\">{items_html}</ul>"
+
+def _parse_final_summary(text: str) -> dict:
+    """Parse LLM final summary into sections: summary, strengths, improvements, resources, overall_score."""
+    if not text:
+        return {"summary": "", "strengths": [], "improvements": [], "resources": [], "overall_score": None}
+    cleaned = _strip_markdown(text)
+    # Split by lines and detect sections
+    lines = [l.strip() for l in cleaned.splitlines() if l.strip()]
+    sections = {"summary": [], "strengths": [], "improvements": [], "resources": [], "overall_score": None}
+    current = "summary"
+    for line in lines:
+        low = line.lower()
+        if "strength" in low and ("area" not in low or "strength" in low and "areas" not in low) and len(line) < 60:
+            current = "strengths"; continue
+        if ("areas for improvement" in low) or ("improvement" in low and len(line) < 60):
+            current = "improvements"; continue
+        if ("resource" in low) and len(line) < 60:
+            current = "resources"; continue
+        if ("overall score" in low) or re.match(r"^score\s*[: ]", low):
+            # try to grab score
+            m = re.search(r"(\d+(?:\.\d+)?)\s*/?\s*10", low)
+            if m:
+                sections["overall_score"] = float(m.group(1))
+            current = "summary"; continue
+        sections[current].append(line)
+    return sections
+
+def _format_resource_item(title: str, url: str) -> str:
+    safe_title = html.escape(title or "")
+    if isinstance(url, str) and (url.startswith("https://") or url.startswith("http://")):
+        safe_url = html.escape(url)
+        return f"<li><a href=\"{safe_url}\" target=\"_blank\" rel=\"noopener noreferrer\">{safe_title}</a></li>"
+    return f"<li>{safe_title}</li>"
+
 def main():
-    st.title("Interview Preparation Bot")
+    # Inject base CSS
+    try:
+        with open("styles.css", "r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    except Exception:
+        pass
+
+    st.markdown("<h1 class=\"app-title\">Mock View</h1>", unsafe_allow_html=True)
+    st.caption("Practice interviews tailored to your role, get instant feedback, and track performance.")
     
     # Sidebar for setup
     with st.sidebar:
@@ -176,10 +259,18 @@ def main():
             # Calculate current question number and total questions
             current_idx = st.session_state.interview_bot.current_question_index
             total_questions = len(st.session_state.interview_bot.questions)
+
+            # Top progress
+            progress_ratio = max(0, min(1, current_idx / max(1, total_questions)))
+            st.progress(progress_ratio)
             
             # Display question number and progress
             st.subheader(f"Question {current_idx + 1} of {total_questions}")
-            st.write(st.session_state.current_question)
+            st.markdown(f"""
+<div class=\"card\">
+<p style=\"margin: 0; font-size: 1.05rem; line-height: 1.6;\">{st.session_state.current_question}</p>
+</div>
+""", unsafe_allow_html=True)
             
             # Initialize session state variables if not exists
             if 'current_answer' not in st.session_state:
@@ -194,11 +285,13 @@ def main():
                 st.session_state.answer_submitted = False
 
             # Answer input with session state
-            answer = st.text_area("Your Answer:", 
-                                value=st.session_state.current_answer,
-                                height=150,
-                                key=f"answer_{current_idx}",
-                                disabled=st.session_state.answer_submitted)  # Disable after submission
+            answer = st.text_area(
+                "Your Answer:", 
+                value=st.session_state.current_answer,
+                height=180,
+                key=f"answer_{current_idx}",
+                disabled=st.session_state.answer_submitted
+            )
             
             # Create columns for button alignment
             left_align, _ = st.columns([1, 3])
@@ -234,59 +327,131 @@ def main():
             
             # Show feedback, score, and ideal answer after submission
             if st.session_state.answer_submitted:
-                # Score and Feedback section
-                st.markdown("### Your Score")
-                st.progress(st.session_state.current_score)
-                st.write(f"Score: {st.session_state.current_score * 10:.1f}/10")
+                # 1) Big score + bar
+                score_val = st.session_state.current_score or 0
+                score_out_of_10 = score_val * 10
+                st.markdown("""
+<div class="card">
+	<div class="section-header">Score</div>
+	<div style="display:flex;gap:12px;align-items:center;">
+		<div style="font-size: 2.4rem; font-weight: 800; line-height: 1;">{:.1f}</div>
+		<div style="flex:1;">
+			<div style="font-size: 0.9rem; opacity:0.85;">out of 10</div>
+		</div>
+	</div>
+</div>
+""".format(score_out_of_10), unsafe_allow_html=True)
+                st.progress(score_val)
                 
-                st.markdown("### Feedback")
-                st.write(st.session_state.current_feedback)
+                # 2) Short bullet summary from feedback
+                bullets_html = _bulletify_feedback(st.session_state.current_feedback)
+                st.markdown(f"""
+<div class="card">
+	<div class="section-header">Key Points</div>
+	{bullets_html}
+</div>
+""", unsafe_allow_html=True)
                 
-                st.markdown("### Model Answer")
-                st.write(st.session_state.interview_bot.ideal_answers[current_idx])
+                # 3) Model answer (content enclosed within the card)
+                model_answer_html = html.escape(_strip_markdown(st.session_state.interview_bot.ideal_answers[current_idx] or "")).replace('\n','<br>')
+                st.markdown(f"""
+<div class="card">
+	<div class="section-header">Model Answer</div>
+	<div class="model-answer">{model_answer_html}</div>
+</div>
+""", unsafe_allow_html=True)
         
         else:
-            # Show final summary
-            st.subheader("Interview Complete! 🎯")
+            # Show final summary structured per requested format
+            st.subheader("Final Feedback")
             summary = st.session_state.interview_bot.generate_final_summary()
+            parsed = _parse_final_summary(summary.get('summary', ''))
             
-            # Overall score with visual indicator
-            st.markdown("### Overall Performance")
-            final_score = summary['average_score']*10
-            st.progress(summary['average_score'])
-            st.markdown(f"### Final Score: {final_score:.1f}/10")
+            # 1) Final score
+            final_score = summary['average_score'] * 10
+            disp_score = parsed['overall_score'] if parsed['overall_score'] is not None else final_score
+            st.markdown("""
+<div class="card">
+	<div class="section-header">Final Score</div>
+	<div style="display:flex;gap:12px;align-items:center;">
+		<div style="font-size: 2.6rem; font-weight: 800; line-height: 1;">{:.1f}</div>
+		<div style="flex:1;">
+			<div style="font-size: 0.9rem; opacity:0.85;">out of 10</div>
+		</div>
+	</div>
+</div>
+""".format(disp_score), unsafe_allow_html=True)
+            st.progress(min(1.0, max(0.0, (disp_score/10) if disp_score else 0)))
             
-            # Question by Question Analysis
-            st.markdown("### Detailed Analysis")
-            for i, (q, a, ideal_a, f, s) in enumerate(zip(
-                st.session_state.interview_bot.questions,
-                st.session_state.interview_bot.answers,
-                st.session_state.interview_bot.ideal_answers,
-                st.session_state.interview_bot.feedback,
-                st.session_state.interview_bot.scores
-            )):
-                with st.expander(f"Question {i+1}: {q[:100]}..."):
-                    st.markdown("### Question")
-                    st.write(q)
-                    
-                    col1, col2 = st.columns([1, 1])
-                    
-                    with col1:
-                        st.markdown("### Your Answer")
-                        st.write(a)
-                        st.progress(s)
-                        st.markdown(f"Score: {s*10:.1f}/10")
-                    
-                    with col2:
-                        st.markdown("### Model Answer")
-                        st.write(ideal_a)
-                    
-                    st.markdown("### Feedback")
-                    st.write(f)
+            # 2) Feedback of each question and model answer (dropdowns)
+            st.markdown("""
+<div class="card">
+	<div class="section-header">Question-by-Question Feedback</div>
+</div>
+""", unsafe_allow_html=True)
+            for i, (q, a, f) in enumerate(summary['qa_pairs']):
+                q_clean = _strip_markdown(q)
+                label = f"Q{i+1}: {q_clean[:90]}{'...' if len(q_clean) > 90 else ''}"
+                with st.expander(label, expanded=False):
+                    q_html = html.escape(q_clean).replace('\n','<br>')
+                    a_html = html.escape(_strip_markdown(a)).replace('\n','<br>')
+                    f_bullets = _bulletify_feedback(f, max_items=6)
+                    model = st.session_state.interview_bot.ideal_answers[i] if i < len(st.session_state.interview_bot.ideal_answers) else ""
+                    m_html = html.escape(_strip_markdown(model)).replace('\n','<br>')
+                    st.markdown(f"""
+<div class="card">
+	<div style="font-weight:700; margin-bottom:8px;">Q{i+1}. {q_html}</div>
+	<div style="opacity:0.85; margin-bottom:8px;">Your Answer</div>
+	<div class="model-answer" style="margin-bottom:10px;">{a_html}</div>
+	<div style="opacity:0.85; margin-bottom:6px;">Key Points</div>
+	{f_bullets}
+	<div class="section-header" style="margin-top:12px;">Model Answer</div>
+	<div class="model-answer">{m_html}</div>
+</div>
+""", unsafe_allow_html=True)
             
-            # Summary section
-            st.markdown("### Summary Evaluation")
-            st.write(summary['summary'])
+            # 3) Overall feedback summary
+            overall_text = html.escape("\n".join(parsed['summary'])).replace('\n','<br>')
+            st.markdown(f"""
+<div class="card">
+	<div class="section-header">Overall Feedback Summary</div>
+	<div class="model-answer">{overall_text}</div>
+</div>
+""", unsafe_allow_html=True)
+            
+            # 4) Areas of strength
+            strengths_items = "\n".join([f"<li>{html.escape(it)}</li>" for it in parsed['strengths']]) or "<li>Not specified.</li>"
+            st.markdown(f"""
+<div class="card">
+	<div class="section-header">Areas of Strength</div>
+	<ul class="bullets">{strengths_items}</ul>
+</div>
+""", unsafe_allow_html=True)
+            
+            # 5) Areas to improve
+            improve_items = "\n".join([f"<li>{html.escape(it)}</li>" for it in parsed['improvements']]) or "<li>Not specified.</li>"
+            st.markdown(f"""
+<div class="card">
+	<div class="section-header">Areas to Improve</div>
+	<ul class="bullets">{improve_items}</ul>
+</div>
+""", unsafe_allow_html=True)
+            
+            # 6) Suggested resources (AI-generated)
+            ai_resources = st.session_state.interview_bot.generate_learning_resources(
+                session_summary=summary.get('summary', ''),
+                num_items=8,
+            )
+            if ai_resources:
+                items_html = "\n".join([_format_resource_item(t, u) for t, u in ai_resources])
+            else:
+                items_html = "<li>No resources suggested.</li>"
+            st.markdown(f"""
+<div class="card">
+	<div class="section-header">Suggested Resources</div>
+	<ul class="bullets">{items_html}</ul>
+</div>
+""", unsafe_allow_html=True)
             
             # Export options
             if st.button("Export to PDF"):
@@ -307,6 +472,19 @@ def main():
                     try:
                         st.session_state.session_manager.export_to_pdf(session_data, pdf_path)
                         st.success(f"Interview session exported to: {pdf_path}")
+                        # Offer direct download
+                        try:
+                            with open(pdf_path, 'rb') as f:
+                                pdf_bytes = f.read()
+                            st.download_button(
+                                label="Download PDF",
+                                data=pdf_bytes,
+                                file_name=os.path.basename(pdf_path),
+                                mime="application/pdf",
+                                key=f"download_pdf_{os.path.basename(pdf_path)}"
+                            )
+                        except Exception as read_err:
+                            st.warning(f"PDF created but could not read file for download: {read_err}")
                     except ImportError as e:
                         st.error(str(e))
                         st.info("Your session has been saved as JSON. Install the required dependencies to export as PDF.")

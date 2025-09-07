@@ -1,0 +1,166 @@
+/* Title badge and section headers inside cards */
+.card .section-header {
+	background: linear-gradient(135deg, rgba(108,92,231,0.18), rgba(124,58,237,0.18));
+	border: 1px solid rgba(255,255,255,0.08);
+	border-radius: 12px;
+	padding: 10px 14px;
+	margin: 0 0 var(--space-3) 0;
+	font-weight: 700;
+	font-size: 1.15rem;
+}
+
+/* Custom bullets for feedback */
+ul.bullets {
+	margin: 0;
+	padding-left: 1.25rem;
+}
+ul.bullets li {
+	margin-bottom: 10px;
+	line-height: 1.6;
+}
+ul.bullets li::marker {
+	color: #a78bfa;
+}
+
+/* Model answer paragraph spacing */
+.model-answer {
+	margin-top: var(--space-2);
+	line-height: 1.8;
+	font-size: 1.05rem;
+}
+
+.app-title {
+	margin-top: 5px;
+}
+
+/* Design tokens */
+:root {
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 32px;
+}
+
+/* Global app background and typography */
+.stApp {
+	background: radial-gradient(1200px 600px at 10% 10%, rgba(108,92,231,0.12), transparent 60%),
+		radial-gradient(900px 500px at 90% 0%, rgba(20,184,166,0.08), transparent 60%),
+		#0f172a;
+	color: #e5e7eb;
+	font-feature-settings: "kern" 1;
+}
+
+/* Block container spacing */
+.block-container {
+	padding-top: var(--space-5) !important;
+	padding-bottom: var(--space-6) !important;
+}
+
+/* Tighten main container width on wide layout for readability */
+.main > div {
+	max-width: 1200px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+/* Headings */
+h1, h2, h3, h4 {
+	letter-spacing: 0.2px;
+	margin-top: var(--space-4);
+	margin-bottom: var(--space-3);
+}
+
+/* Spacing utilities */
+.mt-1 { margin-top: var(--space-1); }
+.mt-2 { margin-top: var(--space-2); }
+.mt-3 { margin-top: var(--space-3); }
+.mt-4 { margin-top: var(--space-4); }
+.mt-5 { margin-top: var(--space-5); }
+.mt-6 { margin-top: var(--space-6); }
+.mb-1 { margin-bottom: var(--space-1); }
+.mb-2 { margin-bottom: var(--space-2); }
+.mb-3 { margin-bottom: var(--space-3); }
+.mb-4 { margin-bottom: var(--space-4); }
+.mb-5 { margin-bottom: var(--space-5); }
+.mb-6 { margin-bottom: var(--space-6); }
+.spacer { height: var(--space-4); }
+
+/* Sidebar styling */
+section[data-testid="stSidebar"] {
+	background: #111827;
+	border-right: 1px solid rgba(255,255,255,0.06);
+}
+section[data-testid="stSidebar"] > div {
+	padding: var(--space-2) var(--space-3) var(--space-4) var(--space-3);
+}
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+	margin-top: var(--space-2);
+}
+
+/* Ensure consistent full-width controls in sidebar */
+section[data-testid="stSidebar"] .stButton,
+section[data-testid="stSidebar"] .stSelectbox,
+section[data-testid="stSidebar"] .stRadio,
+section[data-testid="stSidebar"] .stSlider,
+section[data-testid="stSidebar"] .stMarkdown,
+section[data-testid="stSidebar"] [data-testid^="st"] {
+	width: 100% !important;
+}
+
+/* Inputs and text areas - style container as a card with comfortable padding */
+div[data-testid="stTextArea"],
+div[data-testid="stSelectbox"],
+div[data-testid="stRadio"],
+div[data-testid="stSlider"] {
+	background: #0b1220;
+	border: 1px solid rgba(255,255,255,0.06);
+	border-radius: 14px;
+	padding: var(--space-3) var(--space-3);
+	margin-bottom: var(--space-4);
+	width: 100%;
+	box-sizing: border-box;
+}
+textarea, input, select {
+	border-radius: 10px !important;
+}
+
+/* Buttons */
+.stButton { margin-bottom: var(--space-3); }
+.stButton > button {
+	background: linear-gradient(135deg, #6C5CE7 0%, #7C3AED 100%);
+	color: #ffffff;
+	border: 0;
+	border-radius: 10px;
+	padding: 0.6rem 1rem;
+	box-shadow: 0 8px 24px rgba(108,92,231,0.25);
+	width: 100%;
+}
+.stButton > button:hover {
+	filter: brightness(1.04);
+	transform: translateY(-1px);
+	transition: all 120ms ease;
+}
+
+/* Cards for key sections */
+.block-container .card {
+	background: #0b1220;
+	border: 1px solid rgba(255,255,255,0.06);
+	border-radius: 14px;
+	padding: 1rem 1.2rem;
+	margin: var(--space-3) 0;
+}
+
+/* Progress bars */
+div[role="progressbar"] > div {
+	border-radius: 999px;
+}
+
+/* Columns inner spacing */
+.css-ocqkz7, /* legacy fallback */
+[data-testid="column"] > div {
+	padding: var(--space-1) 0;
+}

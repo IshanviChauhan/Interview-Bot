@@ -3,6 +3,7 @@ from typing import Dict, List
 import json
 from datetime import datetime
 import os
+import html
 
 class SessionManager:
     def __init__(self, save_dir: str = "sessions"):
@@ -84,23 +85,25 @@ class SessionManager:
             <html>
             <head>
                 <style>
-                    body {{ font-family: Arial, sans-serif; margin: 40px; }}
-                    h1 {{ color: #2c3e50; }}
-                    .section {{ margin: 20px 0; }}
-                    .question {{ color: #2980b9; }}
-                    .answer {{ margin-left: 20px; }}
-                    .feedback {{ margin-left: 20px; color: #27ae60; }}
-                    .score {{ font-weight: bold; color: #e67e22; }}
+                    body {{ font-family: Arial, sans-serif; margin: 40px; color: #111827; }}
+                    h1 {{ color: #2c3e50; margin-bottom: 8px; }}
+                    .meta p {{ margin: 2px 0; }}
+                    .section {{ margin: 18px 0; }}
+                    .question {{ color: #1f2937; font-weight: 600; }}
+                    .answer, .feedback {{ margin-left: 16px; white-space: pre-wrap; line-height: 1.5; }}
+                    .feedback {{ color: #065f46; }}
+                    .score {{ font-weight: bold; color: #7c3aed; }}
+                    .qa-pair {{ margin-bottom: 14px; }}
                 </style>
             </head>
             <body>
-                <h1>Interview Session Summary</h1>
-                <div class="section">
+                <h1>Mock View - Interview Summary</h1>
+                <div class="section meta">
                     <h2>Session Details</h2>
-                    <p>Role: {session_data.get('role', '')}</p>
-                    <p>Domain: {session_data.get('domain', '')}</p>
-                    <p>Interview Type: {session_data.get('interview_type', '')}</p>
-                    <p>Date: {session_data.get('metadata', {}).get('timestamp', '')}</p>
+                    <p>Role: {html.escape(session_data.get('role', ''))}</p>
+                    <p>Domain: {html.escape(session_data.get('domain', ''))}</p>
+                    <p>Interview Type: {html.escape(session_data.get('interview_type', ''))}</p>
+                    <p>Date: {html.escape(session_data.get('metadata', {}).get('timestamp', ''))}</p>
                     <p class="score">Final Score: {session_data.get('average_score', 0)*10:.1f}/10</p>
                 </div>
                 
@@ -111,7 +114,7 @@ class SessionManager:
                 
                 <div class="section">
                     <h2>Final Summary</h2>
-                    {session_data.get('summary', '').replace('\n', '<br>')}
+                    {html.escape(session_data.get('summary', '')).replace('\n', '<br>')}
                 </div>
             </body>
             </html>
@@ -146,11 +149,16 @@ class SessionManager:
         html_parts = []
         
         for q, a, f in qa_pairs:
+            safe_q = html.escape(q or "")
+            safe_a = html.escape(a or "")
+            safe_f = html.escape(f or "")
+            a_html = safe_a.replace('\n', '<br>')
+            f_html = safe_f.replace('\n', '<br>')
             html_parts.append(f"""
                 <div class="qa-pair">
-                    <p class="question"><strong>Q: {q}</strong></p>
-                    <p class="answer">A: {a}</p>
-                    <p class="feedback">Feedback: {f}</p>
+                    <p class="question">Q: {safe_q}</p>
+                    <p class="answer">A: {a_html}</p>
+                    <p class="feedback">Feedback: {f_html}</p>
                 </div>
             """)
             
