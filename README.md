@@ -40,7 +40,7 @@ An AI-powered interview simulator that generates unique technical or behavioral 
   3. Overall summary
   4. Areas of strength
   5. Areas to improve
-  6. Suggested resources (AI-generated)
+  6. Suggested resources
 
 ## AI-Suggested Resources
 
