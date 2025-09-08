@@ -14,6 +14,16 @@ An AI-powered interview simulator that generates unique technical or behavioral 
 - PDF export with clean formatting and preserved line breaks
 - Session save/load and history in `sessions/`
 
+## Images
+<img width="1919" height="945" alt="image" src="https://github.com/user-attachments/assets/e1744cf6-e5d2-428c-b137-cdf524f1cc2b" />
+<img width="1919" height="934" alt="image" src="https://github.com/user-attachments/assets/9777f1a2-eb8d-4726-a56e-89f808d570ff" />
+<img width="1919" height="954" alt="image" src="https://github.com/user-attachments/assets/d63d9adf-e0bb-4e77-b45d-0e36310c6c0d" />
+<img width="1917" height="941" alt="image" src="https://github.com/user-attachments/assets/ff0cae19-9f95-4eaa-88ff-aa4202242fd0" />
+<img width="1919" height="933" alt="image" src="https://github.com/user-attachments/assets/b2ff596f-10ba-4d57-b775-866bf611bac1" />
+<img width="1919" height="939" alt="image" src="https://github.com/user-attachments/assets/f2d378d4-1021-46ad-9163-49e4fc246717" />
+<img width="1919" height="942" alt="image" src="https://github.com/user-attachments/assets/3c5ec0fd-51d3-4410-856b-7dba0d84f5ef" />
+<img width="1918" height="933" alt="image" src="https://github.com/user-attachments/assets/6aedb8dd-e7f4-4613-97dd-7d742e229a4b" />
+
 ## Technical Interview Spec
 
 - Categories (balanced mix):
