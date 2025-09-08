@@ -2,6 +2,10 @@
 
 An AI-powered interview simulator that generates unique technical or behavioral questions per role/domain, evaluates your answers with detailed feedback and scoring, and produces a structured final report with suggested learning resources.
 
+## 🔗 Live Demo
+
+Check out the project here: [Mock View](https://mock-view.streamlit.app/)
+
 ## Highlights
 
 - Role-aware interviews: Software Engineer, Data Scientist, Product Manager, DevOps Engineer, UX Designer
